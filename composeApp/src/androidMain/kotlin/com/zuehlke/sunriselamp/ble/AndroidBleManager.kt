@@ -7,18 +7,10 @@ import android.content.Context
 import android.os.ParcelUuid
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-
-sealed class BleState {
-    object Idle         : BleState()
-    object Scanning     : BleState()
-    object Connecting   : BleState()
-    object Connected    : BleState()
-    object Disconnected : BleState()
-    data class Error(val message: String) : BleState()
-}
+import java.util.UUID
 
 @SuppressLint("MissingPermission") // Permissions are checked in the UI layer
-class BleManager(private val context: Context) {
+class AndroidBleManager(private val context: Context) : BleManager {
 
     private val bluetoothManager =
         context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
@@ -29,19 +21,19 @@ class BleManager(private val context: Context) {
     private var characteristic: BluetoothGattCharacteristic? = null
 
     private val _state = MutableStateFlow<BleState>(BleState.Idle)
-    val state: StateFlow<BleState> = _state
+    override val state: StateFlow<BleState> = _state
 
     private val _log = MutableStateFlow<List<String>>(emptyList())
-    val log: StateFlow<List<String>> = _log
+    override val log: StateFlow<List<String>> = _log
 
     // ── Scan ──────────────────────────────────────────────────────────────────
 
-    fun startScan() {
+    override fun startScan() {
         _state.value = BleState.Scanning
         appendLog("Scanning for ${BleConstants.DEVICE_NAME}…")
 
         val filter = ScanFilter.Builder()
-            .setServiceUuid(ParcelUuid(BleConstants.SERVICE_UUID))
+            .setServiceUuid(ParcelUuid(UUID.fromString(BleConstants.SERVICE_UUID)))
             .build()
         val settings = ScanSettings.Builder()
             .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
@@ -50,7 +42,7 @@ class BleManager(private val context: Context) {
         scanner.startScan(listOf(filter), settings, scanCallback)
     }
 
-    fun stopScan() {
+    private fun stopScan() {
         scanner.stopScan(scanCallback)
     }
 
@@ -73,7 +65,7 @@ class BleManager(private val context: Context) {
         gatt = device.connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
     }
 
-    fun disconnect() {
+    override fun disconnect() {
         gatt?.disconnect()
     }
 
@@ -100,13 +92,13 @@ class BleManager(private val context: Context) {
                 return
             }
 
-            val service = gatt.getService(BleConstants.SERVICE_UUID)
+            val service = gatt.getService(UUID.fromString(BleConstants.SERVICE_UUID))
             if (service == null) {
                 _state.value = BleState.Error("Echo service not found on device")
                 return
             }
 
-            characteristic = service.getCharacteristic(BleConstants.CHAR_UUID)
+            characteristic = service.getCharacteristic(UUID.fromString(BleConstants.CHAR_UUID))
             if (characteristic == null) {
                 _state.value = BleState.Error("Echo characteristic not found")
                 return
@@ -131,7 +123,7 @@ class BleManager(private val context: Context) {
 
     // ── Write ─────────────────────────────────────────────────────────────────
 
-    fun sendMessage(text: String): Boolean {
+    override fun sendMessage(text: String): Boolean {
         val char = characteristic ?: return false
         val g    = gatt           ?: return false
 
