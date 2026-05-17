@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Add these blocks to your existing AndroidManifest.xml.
+  Place the <uses-permission> lines BEFORE the <application> tag.
+  The <activity> entry goes INSIDE <application>.
+-->
+
+<!-- ── BLE permissions ──────────────────────────────────────────────────── -->
+
+<!-- Android 12+ (API 31+) -->
+<uses-permission android:name="android.permission.BLUETOOTH_SCAN"
+    android:usesPermissionFlags="neverForLocation" />
+<uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
+<!-- Android 11 and below -->
+<uses-permission android:name="android.permission.BLUETOOTH"
+    android:maxSdkVersion="30" />
+<uses-permission android:name="android.permission.BLUETOOTH_ADMIN"
+    android:maxSdkVersion="30" />
+<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"
+    android:maxSdkVersion="30" />
+
+<!-- Require BLE hardware -->
+<uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
+
+<!-- ── build.gradle.kts (app) dependencies ──────────────────────────────── -->
+<!--
+  Make sure these are in your app/build.gradle.kts dependencies block:
+
+  implementation("androidx.compose.material3:material3")
+  implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
+  implementation("androidx.activity:activity-compose:1.9.0")
+-->

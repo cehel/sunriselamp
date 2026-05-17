@@ -1,0 +1,9 @@
+package com.zuehlke.sunriselamp
+
+class Greeting {
+    private val platform = getPlatform()
+
+    fun greet(): String {
+        return "Hello, ${platform.name}!"
+    }
+}
