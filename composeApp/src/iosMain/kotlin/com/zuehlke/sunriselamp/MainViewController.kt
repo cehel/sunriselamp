@@ -9,7 +9,12 @@ import com.zuehlke.sunriselamp.ble.IosBleManager
 fun MainViewController() = ComposeUIViewController {
     val vm: BleViewModel = viewModel(
         factory = viewModelFactory {
-            initializer { BleViewModel(IosBleManager()) }
+            initializer {
+                BleViewModel(
+                    bleManager      = IosBleManager(),
+                    alarmRepository = IosAlarmRepository()
+                )
+            }
         }
     )
     // iOS handles BLE permissions via Info.plist — no runtime launcher needed

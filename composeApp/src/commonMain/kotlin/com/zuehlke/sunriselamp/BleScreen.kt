@@ -17,13 +17,16 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.zuehlke.sunriselamp.ble.BleState
+import com.zuehlke.sunriselamp.model.AlarmInfo
 import com.zuehlke.sunriselamp.model.Day
 import com.zuehlke.sunriselamp.model.WakeUpSchedule
 
 @Composable
-fun BleScreen(vm: BleViewModel, onScanRequested: () -> Unit) {
-    val state by vm.state.collectAsState()
-    val log   by vm.log.collectAsState()
+fun BleScreen(vm: BleViewModel, onScanRequested: () -> Unit, onOpenClockApp: () -> Unit = {}) {
+    val state         by vm.state.collectAsState()
+    val log           by vm.log.collectAsState()
+    val alarms        by vm.alarms.collectAsState()
+    val alarmsLoading by vm.alarmsLoading.collectAsState()
 
     val listState = rememberLazyListState()
 
@@ -66,7 +69,17 @@ fun BleScreen(vm: BleViewModel, onScanRequested: () -> Unit) {
             }
 
             AnimatedVisibility(visible = state is BleState.Connected) {
-                AlarmConfigurator(onSend = { vm.sendAlarm(it) })
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SystemAlarmsSection(
+                        alarms        = alarms,
+                        loading       = alarmsLoading,
+                        onLoad        = { vm.loadAlarms() },
+                        onSend        = { vm.sendAlarmInfo(it) },
+                        onOpenClock   = onOpenClockApp
+                    )
+                    HorizontalDivider()
+                    AlarmConfigurator(onSend = { vm.sendAlarm(it) })
+                }
             }
 
             Text("Log", style = MaterialTheme.typography.labelLarge)
@@ -91,6 +104,123 @@ fun BleScreen(vm: BleViewModel, onScanRequested: () -> Unit) {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SystemAlarmsSection(
+    alarms:      List<AlarmInfo>,
+    loading:     Boolean,
+    onLoad:      () -> Unit,
+    onSend:      (AlarmInfo) -> Unit,
+    onOpenClock: () -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            verticalAlignment     = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier              = Modifier.fillMaxWidth()
+        ) {
+            Text("System Alarms", style = MaterialTheme.typography.titleMedium)
+            if (loading) {
+                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+            } else {
+                TextButton(onClick = onLoad) { Text("Load") }
+            }
+        }
+
+        val isAlarmManagerOnly = alarms.size == 1 &&
+                alarms.first().source == com.zuehlke.sunriselamp.model.AlarmSource.ALARM_MANAGER
+
+        when {
+            alarms.isEmpty() && !loading -> Text(
+                text  = "Tap Load to read alarms from your clock app.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.outline
+            )
+            isAlarmManagerOnly -> {
+                // Modern Pixel / Google Clock blocks content provider access
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f))
+                        .padding(10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment     = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text     = "Your clock app doesn't share alarm data.\nShowing next alarm only.",
+                        style    = MaterialTheme.typography.bodySmall,
+                        color    = MaterialTheme.colorScheme.onTertiaryContainer,
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextButton(onClick = onOpenClock) { Text("Open Clock") }
+                }
+                AlarmCard(alarm = alarms.first(), onSend = { onSend(alarms.first()) })
+            }
+            else -> AlarmList(alarms = alarms, onSend = onSend)
+        }
+    }
+}
+
+@Composable
+private fun AlarmList(alarms: List<AlarmInfo>, onSend: (AlarmInfo) -> Unit) {
+    LazyColumn(
+        modifier            = Modifier
+            .fillMaxWidth()
+            .heightIn(max = 320.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        items(alarms, key = { it.id }) { alarm ->
+            AlarmCard(alarm = alarm, onSend = { onSend(alarm) })
+        }
+    }
+}
+
+@Composable
+private fun AlarmCard(alarm: AlarmInfo, onSend: () -> Unit) {
+    val containerColor = if (alarm.enabled)
+        MaterialTheme.colorScheme.primaryContainer
+    else
+        MaterialTheme.colorScheme.surfaceVariant
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(containerColor)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment     = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                text  = alarm.formattedTime(),
+                style = MaterialTheme.typography.headlineSmall
+            )
+            if (alarm.label.isNotBlank()) {
+                Text(text = alarm.label, style = MaterialTheme.typography.bodySmall)
+            }
+            when {
+                alarm.days.isNotEmpty() -> Text(
+                    text  = alarm.days.sortedBy { it.ordinal }.joinToString(" ") { it.label },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                alarm.source == com.zuehlke.sunriselamp.model.AlarmSource.ALARM_MANAGER -> Text(
+                    text  = "Next scheduled — repeat days unknown",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                else -> Text(
+                    text  = "One-time",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        Button(onClick = onSend) { Text("Send") }
     }
 }
 

@@ -1,6 +1,8 @@
 package com.zuehlke.sunriselamp
 
 import android.Manifest
+import android.content.Intent
+import android.provider.AlarmClock
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
@@ -24,7 +26,12 @@ fun BleScreenWithPermissions() {
     val context = LocalContext.current
     val vm: BleViewModel = viewModel(
         factory = viewModelFactory {
-            initializer { BleViewModel(AndroidBleManager(context.applicationContext)) }
+            initializer {
+                BleViewModel(
+                    bleManager      = AndroidBleManager(context.applicationContext),
+                    alarmRepository = AndroidAlarmRepository(context.applicationContext)
+                )
+            }
         }
     )
 
@@ -35,7 +42,12 @@ fun BleScreenWithPermissions() {
     }
 
     BleScreen(
-        vm             = vm,
-        onScanRequested = { permLauncher.launch(blePermissions) }
+        vm              = vm,
+        onScanRequested = { permLauncher.launch(blePermissions) },
+        onOpenClockApp  = {
+            context.startActivity(
+                Intent(AlarmClock.ACTION_SHOW_ALARMS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        }
     )
 }
